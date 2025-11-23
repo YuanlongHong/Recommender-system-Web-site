@@ -1,0 +1,77 @@
+#!/usr/bin/env python3
+import sys
+import random
+from itertools import combinations
+
+# --- Item-Based Reducer 1 ---
+# Goal: Generate pairs of movies rated by the same user
+# Input: userId \t movieId:rating
+# Output: movie1,movie2 \t rating1,rating2
+
+current_user = None
+movie_ratings = []
+
+# --- CONFIGURATION EXPLANATION ---
+# Threshold: Maximum number of movies per user to process.
+# Why? Generating pairs is an O(N^2) operation.
+# N=200  -> 19,900 pairs
+# N=500  -> 124,750 pairs
+# N=1000 -> 499,500 pairs
+# Since users rarely watch > 1000 movies compared to pop movies having 50k+ viewers,
+# we set this higher than the User-Based equivalent.
+MAX_MOVIES_PER_USER = 500
+
+def process_user(user, movie_ratings):
+    """
+    Generates pairs of movies watched by the same user.
+    Output format: MovieA,MovieB \t RatingA,RatingB
+    """
+    n = len(movie_ratings)
+    if n < 2:
+        return
+
+    if n > MAX_MOVIES_PER_USER:
+        # Random sampling preserves the statistical distribution of the user's taste
+        movie_ratings = random.sample(movie_ratings, MAX_MOVIES_PER_USER)
+
+    # Generate pairwise combinations of movies
+    # Using combinations ensures we get (A,B) but not (B,A).
+    # The similarity metric (Cosine) is symmetric anyway.
+    for a, b in combinations(movie_ratings, 2):
+        try:
+            m1, r1 = a.split(':', 1)
+            m2, r2 = b.split(':', 1)
+
+            # Ensure consistent ordering of keys to avoid duplicating (A,B) and (B,A) downstream
+            if m1 < m2:
+                print(f"{m1},{m2}\t{r1},{r2}")
+            else:
+                print(f"{m2},{m1}\t{r2},{r1}")
+
+        except ValueError:
+            continue
+
+for line in sys.stdin:
+    line = line.strip()
+    if not line:
+        continue
+
+    try:
+        # Input format: userId \t movieId:rating
+        user, mr = line.split("\t", 1)
+    except ValueError:
+        continue
+
+    if current_user is None:
+        current_user = user
+
+    if user != current_user:
+        process_user(current_user, movie_ratings)
+        current_user = user
+        movie_ratings = []
+
+    movie_ratings.append(mr)
+
+# Process the last user
+if current_user is not None:
+    process_user(current_user, movie_ratings)
